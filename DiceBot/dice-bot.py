@@ -1,6 +1,7 @@
 # dice-bot.py
 import os
 import random
+import re
 
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -9,29 +10,34 @@ from discord.ext import commands
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
+# regex
+THROW_REGEX = r'^!\d{1,2}d\d{1,3}$'
+
 # instantiate bot
 bot = commands.Bot(command_prefix='!')
 
-# commands
-@bot.command(name="d4", help="Throw a d4")
-async def d4(ctx):
-    await dice(ctx, 1, 4)
+def dice(n_throws: int, n_sides: int):
+    rolls = [str(random.choice(range(1, n_sides + 1))) for _ in range(n_throws)]
+    return rolls
 
-@bot.command(name="d8", help="Throw a d8")
-async def d8(ctx):
-    await dice(ctx, 1, 8)
+def validate_throw(msg):
+    regex = re.compile(THROW_REGEX)
+    return regex.match(msg.content)
 
-@bot.command(name="d10", help="Throw a d10")
-async def d10(ctx):
-    await dice(ctx, 1, 10)
+# events
+@bot.event
+async def on_message(message):
+    out = ''
+    if message.content[0] == '!' and message.author != bot.user and not validate_throw(message):
+        out = "```Use me to throw between 1 and 99 dice having between 1 and 999 faces!\n"\
+            "This can be done by typing 'number of throws'd'number of faces'\n"\
+            "For example: 5d10```"
+    else:
+        params = message.content.strip('!').split('d')
+        dice_throw = dice(int(params[0]), int(params[1]))
+        out = ', '.join(dice_throw)
+    
+    await message.channel.send(out)
 
-@bot.command(name="d20", help="Throw a d20")
-async def d20(ctx):
-    await dice(ctx, 1, 20)
-
-@bot.command(name="throw", help="Make {n_throws} of a {n_sides} dice. | EX : !throw 5 10")
-async def dice(ctx, n_throws: int, n_sides: int):
-    response = [str(random.choice(range(1, n_sides + 1))) for _ in range(n_throws)]
-    await ctx.send(', '.join(response))
-
-bot.run(TOKEN)
+if __name__ == "__main__":
+    bot.run(TOKEN)
